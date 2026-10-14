@@ -4,6 +4,7 @@
 #   scripts/fork-install.sh             build + install; restart the server yourself
 #   scripts/fork-install.sh --handoff   build + install, then hand live panes to the new server
 #   scripts/fork-install.sh --restore   put the original upstream binary back
+#   scripts/fork-install.sh --restore --handoff   ...and hand live panes to it
 #
 # The first install keeps the upstream binary as herdr.upstream; every install keeps
 # the binary it replaced as herdr.prev. Do not run `herdr update` on this install: it
@@ -17,17 +18,33 @@ export PATH="$HOME/.cargo/bin:$PATH"
 export ZIG="${ZIG:-$HOME/.local/share/zig-0.16.0/zig}"
 
 handoff=false
-case "${1:-}" in
-  --handoff) handoff=true ;;
-  --restore)
-    [[ -x "$target.upstream" ]] || { echo "no $target.upstream to restore" >&2; exit 1; }
-    cp "$target.upstream" "$target.new" && mv -f "$target.new" "$target"
-    echo "restored upstream: $("$target" --version)"
-    exit 0
-    ;;
-  "") ;;
-  *) echo "usage: $0 [--handoff|--restore]" >&2; exit 2 ;;
-esac
+restore=false
+for arg in "$@"; do
+  case "$arg" in
+    --handoff) handoff=true ;;
+    --restore) restore=true ;;
+    *) echo "usage: $0 [--restore] [--handoff]" >&2; exit 2 ;;
+  esac
+done
+
+finish() {
+  if $handoff; then
+    "$target" server live-handoff --import-exe "$target"
+    echo "server handed off; detach (prefix+q) and run herdr to load the new client"
+  else
+    echo "run '$target server live-handoff --import-exe $target' or restart the server to use it,"
+    echo "then detach (prefix+q) and run herdr to load the new client"
+  fi
+}
+
+if $restore; then
+  [[ -x "$target.upstream" ]] || { echo "no $target.upstream to restore" >&2; exit 1; }
+  cp "$target.upstream" "$target.new"
+  mv -f "$target.new" "$target"
+  echo "restored upstream: $("$target" --version)"
+  finish
+  exit 0
+fi
 
 cd "$repo"
 commit="$(git rev-parse --short=12 HEAD)"
@@ -44,11 +61,4 @@ fi
 cp target/release/herdr "$target.new"
 mv -f "$target.new" "$target"
 echo "installed $("$target" --version) ($commit) -> $target"
-
-if $handoff; then
-  "$target" server live-handoff --import-exe "$target"
-  echo "server handed off; detach (prefix+q) and run herdr to load the new client"
-else
-  echo "run '$target server live-handoff --import-exe $target' or restart the server to use it,"
-  echo "then detach (prefix+q) and run herdr to load the new client"
-fi
+finish
