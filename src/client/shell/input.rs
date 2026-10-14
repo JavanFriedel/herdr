@@ -904,7 +904,19 @@ impl ClientShellState {
         .into_iter()
         .find_map(|(bindings, action)| bindings.matches_direct_key(key).then_some(action));
         if let Some(action) = tab_action {
-            self.record_navigate_binding(KeybindMatch::Action(action), true, outcome);
+            // Tabs follow the workspace highlight, so the sidebar and the tab bar never
+            // point at different workspaces.
+            if let Some(tab_id) =
+                self.highlighted_workspace_tab_step(action == KeybindAction::PreviousTab)
+            {
+                self.push_endpoint_method(
+                    crate::api::schema::Method::TabFocus(crate::api::schema::TabTarget { tab_id }),
+                    outcome,
+                );
+                outcome.repaint = true;
+            } else {
+                self.record_navigate_binding(KeybindMatch::Action(action), true, outcome);
+            }
             return;
         }
 

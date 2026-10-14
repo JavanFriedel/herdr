@@ -200,4 +200,37 @@ impl ClientShellState {
         }
         outcome.repaint = true;
     }
+
+    /// The tab one step from the highlighted workspace's active tab, when the navigate
+    /// highlight sits on a local workspace other than the focused one. Focusing that tab
+    /// also switches to its workspace.
+    pub(super) fn highlighted_workspace_tab_step(&self, previous: bool) -> Option<String> {
+        let target = self
+            .navigate_workspace_id
+            .as_ref()
+            .filter(|target| target.endpoint_id == self.active_endpoint_id)?;
+        let snapshot = self.snapshot.as_deref()?;
+        if snapshot.focused_workspace_id.as_deref() == Some(target.workspace_id.as_str()) {
+            return None;
+        }
+        let workspace = snapshot
+            .workspaces
+            .iter()
+            .find(|workspace| workspace.workspace_id == target.workspace_id)?;
+        let tabs = snapshot
+            .tabs
+            .iter()
+            .filter(|tab| tab.workspace_id == target.workspace_id)
+            .collect::<Vec<_>>();
+        if tabs.is_empty() {
+            return None;
+        }
+        let current = tabs
+            .iter()
+            .position(|tab| tab.tab_id == workspace.active_tab_id)
+            .unwrap_or(0);
+        let delta = if previous { -1 } else { 1 };
+        let next = (current as isize + delta).rem_euclid(tabs.len() as isize) as usize;
+        Some(tabs[next].tab_id.clone())
+    }
 }
