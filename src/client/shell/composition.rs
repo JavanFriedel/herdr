@@ -35,6 +35,7 @@ impl ClientShellState {
         } else {
             Rect::new(0, 1, cols, rows.saturating_sub(2))
         };
+        let agent_navigating = self.mode == ClientShellMode::AgentNavigate;
         let valid_navigation_target = self.mode == ClientShellMode::Navigate
             && self
                 .navigate_workspace_id
@@ -74,6 +75,7 @@ impl ClientShellState {
                 .as_ref()
                 .filter(|_| valid_navigation_target)
                 .or_else(|| pending_workspace_highlight.map(|pending| &pending.target)),
+            selected_agent: self.navigate_agent.as_ref().filter(|_| agent_navigating),
             reveal_navigation_workspace: &mut self.reveal_navigation_workspace,
             dragged_workspace_id: None,
             workspace_drop_indicator_row: None,
@@ -159,6 +161,7 @@ impl ClientShellState {
             self.reveal_mobile_workspace = true;
         }
         self.last_composed_size = Some((cols, rows));
+        let agent_navigating = self.mode == ClientShellMode::AgentNavigate;
         let valid_navigation_target = self.mode == ClientShellMode::Navigate
             && self
                 .navigate_workspace_id
@@ -230,6 +233,7 @@ impl ClientShellState {
                     .as_ref()
                     .filter(|_| valid_navigation_target)
                     .or_else(|| pending_workspace_highlight.map(|pending| &pending.target)),
+                selected_agent: self.navigate_agent.as_ref().filter(|_| agent_navigating),
                 reveal_navigation_workspace: &mut self.reveal_navigation_workspace,
                 dragged_workspace_id,
                 workspace_drop_indicator_row,

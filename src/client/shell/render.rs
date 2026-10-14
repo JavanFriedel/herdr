@@ -109,6 +109,32 @@ pub(super) fn render_mode_bar(
                     (" keybinds".to_owned(), base),
                 ]);
             }
+            ClientShellMode::AgentNavigate => {
+                let agent_keys = &keybinds.keybinds.agent_navigate;
+                let first_label = |bindings: &crate::config::ActionKeybinds, fallback: &str| {
+                    bindings
+                        .bindings
+                        .first()
+                        .map_or_else(|| fallback.to_owned(), |binding| binding.label.clone())
+                };
+                segments.extend([
+                    (" AGENTS ".to_owned(), mode_style),
+                    (" esc back  ".to_owned(), base),
+                    (
+                        format!(
+                            "{}/{}",
+                            first_label(&agent_keys.down, "↓"),
+                            first_label(&agent_keys.up, "↑")
+                        ),
+                        key,
+                    ),
+                    (" agent  ".to_owned(), base),
+                    ("enter".to_owned(), key),
+                    (" focus  ".to_owned(), base),
+                    ("1..9".to_owned(), key),
+                    (" jump".to_owned(), base),
+                ]);
+            }
             ClientShellMode::Resize => {
                 segments.extend([
                     (" RESIZE ".to_owned(), mode_style),
@@ -245,6 +271,7 @@ pub(super) struct ShellRenderState<'a> {
     pub(super) sidebar_section_split: f32,
     pub(super) tab_drag_insert_index: Option<usize>,
     pub(super) selected_workspace_id: Option<&'a WorkspaceNavigationTarget>,
+    pub(super) selected_agent: Option<&'a AgentNavigationTarget>,
     pub(super) reveal_navigation_workspace: &'a mut bool,
     pub(super) dragged_workspace_id: Option<&'a str>,
     pub(super) workspace_drop_indicator_row: Option<u16>,
@@ -296,6 +323,10 @@ pub(super) fn render_shell(
                 state
                     .selected_workspace_id
                     .map(|target| target.workspace_id.as_str()),
+                state
+                    .selected_agent
+                    .filter(|target| &target.endpoint_id == state.active_endpoint_id)
+                    .map(|target| target.pane_id.as_str()),
                 &mut hits,
             );
         } else {
