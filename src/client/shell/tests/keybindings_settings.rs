@@ -240,6 +240,48 @@ fn manual_client_chrome_preferences_round_trip_per_endpoint() {
 }
 
 #[test]
+fn tab_bar_marks_tabs_that_contain_an_agent_with_its_status() {
+    let mut projected = snapshot();
+    projected.tabs = [
+        ("tab_1", "agents", AgentStatus::Working),
+        ("tab_2", "review", AgentStatus::Blocked),
+        ("tab_3", "shell", AgentStatus::Unknown),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, (tab_id, label, agent_status))| ClientShellTab {
+        tab_id: tab_id.into(),
+        workspace_id: "ws_1".into(),
+        number: index + 1,
+        label: label.into(),
+        custom_label: true,
+        zoomed: false,
+        focused: index == 0,
+        agent_status,
+    })
+    .collect();
+    let mut config = ClientShellConfig::from_config(&Config::default());
+    config.mobile_width_threshold = 0;
+    config.status_indicators = crate::config::StatusIndicatorStyle::Symbols;
+    let palette = config.palette.clone();
+    let mut state = ClientShellState::new(config);
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(120, 20).expect("tab bar with agent status");
+    let top = &frame.cells[..frame.width as usize];
+    let text = top
+        .iter()
+        .map(|cell| cell.symbol.as_str())
+        .collect::<String>();
+    assert!(text.contains("◐ agents"), "{text:?}");
+    assert!(text.contains("× review"), "{text:?}");
+    assert!(text.contains(" shell "), "{text:?}");
+    assert!(!text.contains("· shell"), "{text:?}");
+    let icon = text.chars().position(|ch| ch == '×').expect("blocked icon");
+    assert_eq!(top[icon].fg, crate::protocol::color_to_u32(palette.red));
+}
+
+#[test]
 fn tab_bar_renders_endpoint_status_ellipses_and_clamps_to_useful_scroll() {
     let mut projected = snapshot();
     projected.tab_bar_right = vec![

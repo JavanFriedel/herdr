@@ -9,6 +9,7 @@ pub(crate) fn render_tab_bar(
     area: Rect,
     snapshot: &ClientShellSnapshot,
     config: &ClientShellConfig,
+    tab_status_stale: bool,
     tab_scroll: &mut usize,
     reveal_focused_tab: &mut bool,
     tab_drag_insert_index: Option<usize>,
@@ -25,7 +26,10 @@ pub(crate) fn render_tab_bar(
         .iter()
         .map(|tab| {
             let label = tab_label(tab);
-            display_width(&label).saturating_add(4).max(MIN_TAB_WIDTH)
+            display_width(&label)
+                .saturating_add(tab_status_width(tab))
+                .saturating_add(4)
+                .max(MIN_TAB_WIDTH)
         })
         .collect::<Vec<_>>();
     let content = tab_bar_content_area(snapshot, area);
@@ -114,15 +118,32 @@ pub(crate) fn render_tab_bar(
         } else {
             Style::default().fg(palette.overlay0).bg(palette.surface0)
         };
-        let padding = width.saturating_sub(display_width(&name));
+        let status_width = tab_status_width(tab);
+        let padding = width.saturating_sub(display_width(&name).saturating_add(status_width));
         let left = padding / 2;
         let text = format!(
-            "{empty:left$}{name}{empty:right_padding$}",
+            "{empty:left$}{empty:status_width$}{name}{empty:right_padding$}",
             empty = "",
             left = left as usize,
+            status_width = status_width as usize,
             right_padding = padding.saturating_sub(left) as usize,
         );
         put_text(buffer, rect.x, rect.y, rect.width, &text, style);
+        if status_width > 0 {
+            let icon_x = rect.x.saturating_add(left);
+            put_text(
+                buffer,
+                icon_x,
+                rect.y,
+                rect.right().saturating_sub(icon_x).min(1),
+                status_icon(tab.agent_status, config.status_indicators),
+                if tab_status_stale {
+                    style.fg(palette.overlay0).add_modifier(Modifier::DIM)
+                } else {
+                    style.fg(status_color(tab.agent_status, palette))
+                },
+            );
+        }
         hits.tabs.push((rect, tab.tab_id.clone()));
         first_visible.get_or_insert(index);
         last_visible = Some(index);
@@ -376,6 +397,16 @@ fn tab_label(tab: &ClientShellTab) -> String {
         format!("{} Z", tab.label)
     } else {
         tab.label.clone()
+    }
+}
+
+/// Cells reserved before the label for the agent status icon and its gap.
+/// Tabs without an agent report `Unknown` and keep their plain label.
+fn tab_status_width(tab: &ClientShellTab) -> u16 {
+    if tab.agent_status == crate::api::schema::AgentStatus::Unknown {
+        0
+    } else {
+        2
     }
 }
 
