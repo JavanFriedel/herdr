@@ -201,6 +201,8 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 # navigate_pane_down = "j"
 # navigate_pane_up = "k"
 # navigate_pane_right = "l"     # right arrow always focuses the pane to the right
+# navigate_tab_previous = ""    # optional, e.g. "h" (rebind navigate_pane_left first)
+# navigate_tab_next = ""        # optional, e.g. "l" (rebind navigate_pane_right first)
 
 # Custom commands use the same binding syntax.
 # type = "shell" runs detached in the background.
