@@ -4,7 +4,9 @@ use ratatui::{
     widgets::{Paragraph, Widget},
 };
 
-fn workspace_selection_background(palette: &Palette) -> ratatui::style::Color {
+pub(in crate::client::shell) fn workspace_selection_background(
+    palette: &Palette,
+) -> ratatui::style::Color {
     if palette.selection_bg == ratatui::style::Color::Reset {
         palette.active_row_bg
     } else {
@@ -50,6 +52,7 @@ pub(crate) fn render_collapsed_sidebar(
     snapshot: &ClientShellSnapshot,
     config: &ClientShellConfig,
     selected_workspace_id: Option<&str>,
+    selected_agent_pane_id: Option<&str>,
     hits: &mut ShellHitMap,
 ) {
     let palette = &config.palette;
@@ -145,7 +148,9 @@ pub(crate) fn render_collapsed_sidebar(
             detail_content.width,
             1,
         );
-        if agent.focused {
+        if selected_agent_pane_id == Some(pane_id.as_str()) {
+            buffer.set_style(rect, Style::default().bg(selection_background));
+        } else if agent.focused {
             buffer.set_style(rect, Style::default().bg(palette.active_row_bg));
         }
         put_text(
@@ -435,6 +440,10 @@ pub(crate) fn render_sidebar(
         detail_area,
         snapshot,
         config,
+        state
+            .selected_agent
+            .filter(|target| &target.endpoint_id == state.active_endpoint_id)
+            .map(|target| target.pane_id.as_str()),
         state.agent_scroll,
         hits,
     );

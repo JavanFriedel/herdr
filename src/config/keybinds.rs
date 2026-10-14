@@ -349,10 +349,19 @@ pub struct NavigateKeybinds {
     pub tab_next: ActionKeybinds,
 }
 
+/// Parsed keybinds for agent navigate mode. Checked separately from navigate mode,
+/// so the same plain keys can mean different things in each mode.
+#[derive(Debug, Clone)]
+pub struct AgentNavigateKeybinds {
+    pub up: ActionKeybinds,
+    pub down: ActionKeybinds,
+}
+
 /// Parsed keybinds for Herdr actions.
 #[derive(Debug, Clone)]
 pub struct Keybinds {
     pub navigate: NavigateKeybinds,
+    pub agent_navigate: AgentNavigateKeybinds,
     pub help: ActionKeybinds,
     pub settings: ActionKeybinds,
     pub new_workspace: ActionKeybinds,
@@ -362,6 +371,7 @@ pub struct Keybinds {
     pub rename_workspace: ActionKeybinds,
     pub close_workspace: ActionKeybinds,
     pub workspace_picker: ActionKeybinds,
+    pub agent_picker: ActionKeybinds,
     pub goto: ActionKeybinds,
     pub detach: ActionKeybinds,
     pub reload_config: ActionKeybinds,
@@ -519,6 +529,9 @@ impl Config {
         let mut navigate_registry = BindingRegistry::new(prefix_keys.clone(), prefix_source);
         navigate_registry.reserve_prefix_keys("keys.prefix", prefix_source);
         reserve_navigate_runtime_keys(&mut navigate_registry);
+        let mut agent_navigate_registry = BindingRegistry::new(prefix_keys.clone(), prefix_source);
+        agent_navigate_registry.reserve_prefix_keys("keys.prefix", prefix_source);
+        reserve_agent_navigate_runtime_keys(&mut agent_navigate_registry);
         let prefix = prefix_keys;
 
         macro_rules! empty_action {
@@ -538,6 +551,10 @@ impl Config {
                 tab_previous: empty_action!(),
                 tab_next: empty_action!(),
             },
+            agent_navigate: AgentNavigateKeybinds {
+                up: empty_action!(),
+                down: empty_action!(),
+            },
             help: empty_action!(),
             settings: empty_action!(),
             new_workspace: empty_action!(),
@@ -547,6 +564,7 @@ impl Config {
             rename_workspace: empty_action!(),
             close_workspace: empty_action!(),
             workspace_picker: empty_action!(),
+            agent_picker: empty_action!(),
             goto: empty_action!(),
             detach: empty_action!(),
             reload_config: empty_action!(),
@@ -673,6 +691,24 @@ impl Config {
                 source
             );
             apply_navigate!(keybinds.navigate.tab_next, navigate_tab_next, source);
+            if field_source!(navigate_agent_up) == source {
+                keybinds.agent_navigate.up = parse_navigate_bindings(
+                    "keys.navigate_agent_up",
+                    &self.keys.navigate_agent_up,
+                    &mut agent_navigate_registry,
+                    &mut diagnostics,
+                    source,
+                );
+            }
+            if field_source!(navigate_agent_down) == source {
+                keybinds.agent_navigate.down = parse_navigate_bindings(
+                    "keys.navigate_agent_down",
+                    &self.keys.navigate_agent_down,
+                    &mut agent_navigate_registry,
+                    &mut diagnostics,
+                    source,
+                );
+            }
             apply_action!(keybinds.help, help, source);
             apply_action!(keybinds.settings, settings, source);
             apply_action!(keybinds.new_workspace, new_workspace, source);
@@ -682,6 +718,7 @@ impl Config {
             apply_action!(keybinds.rename_workspace, rename_workspace, source);
             apply_action!(keybinds.close_workspace, close_workspace, source);
             apply_action!(keybinds.workspace_picker, workspace_picker, source);
+            apply_action!(keybinds.agent_picker, agent_picker, source);
             apply_action!(keybinds.goto, goto, source);
             apply_action!(keybinds.detach, detach, source);
             apply_action!(keybinds.reload_config, reload_config, source);
@@ -901,6 +938,29 @@ fn parse_action_bindings(
         }
     }
     ActionKeybinds { bindings }
+}
+
+fn reserve_agent_navigate_runtime_keys(registry: &mut BindingRegistry) {
+    for combo in [
+        (KeyCode::Esc, KeyModifiers::empty()),
+        (KeyCode::Enter, KeyModifiers::empty()),
+        (KeyCode::Up, KeyModifiers::empty()),
+        (KeyCode::Down, KeyModifiers::empty()),
+    ] {
+        registry.reserve_direct(
+            combo,
+            "agent navigate reserved keys",
+            BindingSource::Default,
+        );
+    }
+
+    for idx in '1'..='9' {
+        registry.reserve_direct(
+            (KeyCode::Char(idx), KeyModifiers::empty()),
+            "agent navigate reserved keys",
+            BindingSource::Default,
+        );
+    }
 }
 
 fn parse_navigate_bindings(

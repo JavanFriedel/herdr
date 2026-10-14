@@ -542,6 +542,12 @@
           "description": "Open the workspace navigation surface."
         },
         {
+          "key": "keys.agent_picker",
+          "type": "keybinding",
+          "default": "\"prefix+a\"",
+          "description": "Open agent navigation: move through the agent list and press enter to focus an agent."
+        },
+        {
           "key": "keys.goto",
           "type": "keybinding",
           "default": "\"prefix+g\"",
@@ -594,6 +600,18 @@
           "type": "keybinding",
           "default": "unset",
           "description": "Switch to the next tab in navigate mode without leaving it. Unset by default."
+        },
+        {
+          "key": "keys.navigate_agent_up",
+          "type": "keybinding",
+          "default": "\"k\"",
+          "description": "Move agent selection up in agent navigate mode. Up arrow is always an alias."
+        },
+        {
+          "key": "keys.navigate_agent_down",
+          "type": "keybinding",
+          "default": "\"j\"",
+          "description": "Move agent selection down in agent navigate mode. Down arrow is always an alias."
         },
         {
           "key": "keys.detach",

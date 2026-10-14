@@ -7,12 +7,20 @@ pub(super) fn render_collapsed(
     endpoints: &[ClientShellEndpoint],
     active_endpoint_id: &ClientEndpointId,
     config: &ClientShellConfig,
+    selected: Option<&AgentNavigationTarget>,
     hits: &mut ShellHitMap,
 ) {
     let rows = agent_rows(endpoints, active_endpoint_id, config);
     for (index, row) in rows.into_iter().take(area.height as usize).enumerate() {
         let rect = Rect::new(area.x, area.y + index as u16, area.width, 1);
-        if row.agent.focused {
+        if selected.is_some_and(|target| target.matches(&row.endpoint_id, &row.agent.pane_id)) {
+            buffer.set_style(
+                rect,
+                Style::default().bg(super::render::sidebar::workspace_selection_background(
+                    &config.palette,
+                )),
+            );
+        } else if row.agent.focused {
             buffer.set_style(rect, Style::default().bg(config.palette.active_row_bg));
         }
         let initial = row.machine_label.chars().next().unwrap_or('?');
@@ -49,6 +57,7 @@ pub(super) fn render_expanded(
     endpoints: &[ClientShellEndpoint],
     active_endpoint_id: &ClientEndpointId,
     config: &ClientShellConfig,
+    selected: Option<&AgentNavigationTarget>,
     agent_scroll: &mut usize,
     hits: &mut ShellHitMap,
 ) {
@@ -79,6 +88,14 @@ pub(super) fn render_expanded(
                     Style::default()
                         .fg(config.palette.overlay0)
                         .add_modifier(Modifier::DIM),
+                );
+            }
+            if selected.is_some_and(|target| target.matches(&row.endpoint_id, &row.agent.pane_id)) {
+                buffer.set_style(
+                    rect,
+                    Style::default().bg(super::render::sidebar::workspace_selection_background(
+                        &config.palette,
+                    )),
                 );
             }
             hits.endpoint_agents

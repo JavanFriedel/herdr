@@ -3020,3 +3020,62 @@ fn navigator_foreign_workspace_heading_keeps_the_workspace_target() {
         }] if activated == &endpoint_id && workspace_id == "ws_1"
     ));
 }
+
+#[test]
+fn agent_navigate_mode_crosses_machines_and_highlights_the_remote_row() {
+    let (mut state, endpoint_id) = state_with_remote();
+    let mut local = snapshot();
+    local.agents = vec![agent("local agent", AgentStatus::Idle, 1)];
+    state.set_snapshot(Box::new(local));
+    state
+        .endpoints
+        .iter_mut()
+        .find(|endpoint| endpoint.endpoint_id == endpoint_id)
+        .and_then(|endpoint| endpoint.snapshot.as_mut())
+        .expect("remote snapshot")
+        .agents = vec![agent("remote agent", AgentStatus::Working, 2)];
+    state.compose(100, 28).expect("multi-machine frame");
+
+    state.handle_input_bytes(&[0x02]);
+    state.handle_input_bytes(b"a");
+    assert_eq!(state.mode, ClientShellMode::AgentNavigate);
+    let targets = state.agent_navigation_targets();
+    assert_eq!(targets.len(), 2);
+    let remote_index = targets
+        .iter()
+        .position(|target| target.endpoint_id == endpoint_id)
+        .expect("remote agent target");
+    while state
+        .navigate_agent
+        .as_ref()
+        .is_none_or(|target| target.endpoint_id != endpoint_id)
+    {
+        let outcome = state.handle_input_bytes(b"j");
+        assert!(outcome.actions.is_empty());
+    }
+    assert_eq!(state.navigate_agent, Some(targets[remote_index].clone()));
+
+    let frame = state.compose(100, 28).expect("highlighted frame");
+    let (rect, _, _) = state
+        .hits
+        .endpoint_agents
+        .iter()
+        .find(|(_, row_endpoint, _)| row_endpoint == &endpoint_id)
+        .cloned()
+        .expect("remote agent row");
+    let cell = &frame.cells[usize::from(rect.y) * usize::from(frame.width) + usize::from(rect.x)];
+    assert_eq!(
+        cell.bg,
+        crate::protocol::color_to_u32(super::render::sidebar::workspace_selection_background(
+            &state.config.palette
+        ))
+    );
+
+    let outcome = state.handle_input_bytes(b"\r");
+    assert!(
+        !outcome.actions.is_empty(),
+        "enter should focus the remote agent"
+    );
+    assert_eq!(state.mode, ClientShellMode::Terminal);
+    assert!(state.navigate_agent.is_none());
+}

@@ -19,7 +19,7 @@ fn is_retained_selection_copy_key(key: &crate::input::TerminalKey) -> bool {
 ///
 /// Navigate mode checks this only after keybinding dispatch, so a configured
 /// Ctrl+[ binding keeps working and this stays a fallback cancel.
-fn is_ctrl_bracket_key(key: &crate::input::TerminalKey) -> bool {
+pub(super) fn is_ctrl_bracket_key(key: &crate::input::TerminalKey) -> bool {
     key.code == KeyCode::Char('[') && key.modifiers == KeyModifiers::CONTROL
 }
 
@@ -94,7 +94,7 @@ impl ClientShellState {
     pub(crate) fn host_keyboard_report_all_requested(&self) -> bool {
         matches!(
             self.mode,
-            ClientShellMode::Prefix | ClientShellMode::Navigate
+            ClientShellMode::Prefix | ClientShellMode::Navigate | ClientShellMode::AgentNavigate
         )
     }
 
@@ -708,6 +708,10 @@ impl ClientShellState {
             }
             ClientShellMode::Navigate => {
                 self.route_navigate_key(key, outcome);
+                None
+            }
+            ClientShellMode::AgentNavigate => {
+                self.route_agent_navigate_key(key, outcome);
                 None
             }
             ClientShellMode::Resize => {
