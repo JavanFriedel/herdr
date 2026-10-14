@@ -887,6 +887,23 @@ impl ClientShellState {
             return;
         }
 
+        let tab_action = [
+            (
+                &self.config.keybinds.keybinds.navigate.tab_previous,
+                KeybindAction::PreviousTab,
+            ),
+            (
+                &self.config.keybinds.keybinds.navigate.tab_next,
+                KeybindAction::NextTab,
+            ),
+        ]
+        .into_iter()
+        .find_map(|(bindings, action)| bindings.matches_direct_key(key).then_some(action));
+        if let Some(action) = tab_action {
+            self.record_navigate_binding(KeybindMatch::Action(action), true, outcome);
+            return;
+        }
+
         let binding = crate::input::resolve_non_indexed_action(
             &self.config.keybinds.keybinds,
             key,

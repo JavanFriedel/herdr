@@ -1026,3 +1026,39 @@ fn kitty_ctrl_bracket_cancels_a_blocked_foreign_preview() {
     assert_ne!(state.mode, ClientShellMode::Navigate);
     assert!(state.navigate_workspace_id.is_none());
 }
+
+#[test]
+fn navigate_tab_bindings_cycle_tabs_and_keep_navigation_open() {
+    use crate::api::schema::Method;
+
+    let config: Config =
+        toml::from_str("[keys]\nnavigate_tab_previous = \"h\"\nnavigate_tab_next = \"l\"\n")
+            .unwrap();
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    let mut projected = workspaces(2);
+    projected.tabs = (1..=3)
+        .map(|number| {
+            let mut tab = projected.tabs[0].clone();
+            tab.tab_id = format!("tab_{number}");
+            tab.number = number;
+            tab.focused = number == 1;
+            tab
+        })
+        .collect();
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    state.compose(100, 28).unwrap();
+    enter_navigation(&mut state);
+
+    for (key, expected) in [(b'l', "tab_2"), (b'h', "tab_3")] {
+        let outcome = state.handle_input_bytes(&[key]);
+        let [ClientShellAction::Endpoint { request, .. }] = outcome.actions.as_slice() else {
+            panic!("expected a tab focus request for {key:?}");
+        };
+        let Method::TabFocus(target) = &request.method else {
+            panic!("expected TabFocus, got {:?}", request.method);
+        };
+        assert_eq!(target.tab_id, expected);
+        assert_eq!(state.mode, ClientShellMode::Navigate);
+    }
+}

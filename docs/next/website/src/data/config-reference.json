@@ -584,6 +584,18 @@
           "description": "Focus the pane to the right in navigate mode. Right arrow is always an alias."
         },
         {
+          "key": "keys.navigate_tab_previous",
+          "type": "keybinding",
+          "default": "unset",
+          "description": "Switch to the previous tab in navigate mode without leaving it. Unset by default."
+        },
+        {
+          "key": "keys.navigate_tab_next",
+          "type": "keybinding",
+          "default": "unset",
+          "description": "Switch to the next tab in navigate mode without leaving it. Unset by default."
+        },
+        {
           "key": "keys.detach",
           "type": "keybinding",
           "default": "\"prefix+q\"",
