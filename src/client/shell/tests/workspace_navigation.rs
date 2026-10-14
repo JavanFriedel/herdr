@@ -1065,6 +1065,15 @@ fn navigate_tab_bindings_cycle_tabs_and_keep_navigation_open() {
 
 #[test]
 fn navigate_tab_bindings_follow_the_highlighted_workspace() {
+    assert_navigate_tab_bindings_follow_the_highlighted_workspace(false);
+}
+
+#[test]
+fn navigate_tab_bindings_follow_the_highlighted_workspace_on_a_report_all_host() {
+    assert_navigate_tab_bindings_follow_the_highlighted_workspace(true);
+}
+
+fn assert_navigate_tab_bindings_follow_the_highlighted_workspace(report_all: bool) {
     use crate::api::schema::Method;
 
     let config: Config = toml::from_str(
@@ -1087,6 +1096,8 @@ fn navigate_tab_bindings_follow_the_highlighted_workspace() {
     projected.tabs = tabs;
     state.set_snapshot(Box::new(projected));
     state.set_pane_surface(surface());
+    state.set_host_reports_key_releases(report_all);
+    state.set_host_reports_all_keys(report_all);
     state.compose(100, 28).unwrap();
     enter_navigation(&mut state);
     preview_key(&mut state, b"j");

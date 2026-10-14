@@ -98,6 +98,23 @@ fn agent_navigation_moves_a_highlight_and_focuses_on_enter() {
 }
 
 #[test]
+fn agent_navigation_accepts_plain_text_on_a_report_all_host() {
+    let mut state = agent_navigation_state(&Config::default());
+    state.set_host_reports_key_releases(true);
+    state.set_host_reports_all_keys(true);
+
+    enter_agent_navigation(&mut state);
+    quiet_key(&mut state, b"j");
+    assert_eq!(selected_pane(&state), Some("pane_2"));
+    quiet_key(&mut state, b"k");
+    assert_eq!(selected_pane(&state), Some("pane_1"));
+
+    let outcome = state.handle_input_bytes(b"\r");
+    assert_eq!(focused_pane_request(&outcome), "pane_1");
+    assert_eq!(state.mode, ClientShellMode::Terminal);
+}
+
+#[test]
 fn agent_navigation_ignores_workspace_navigation_keys() {
     let config: Config =
         toml::from_str("[keys]\nnavigate_workspace_up = \"k\"\nnavigate_workspace_down = \"j\"\n")

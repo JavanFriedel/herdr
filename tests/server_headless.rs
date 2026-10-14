@@ -585,6 +585,21 @@ fn server_survives_hangup_and_logs_why_it_stops() {
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
+    // The socket accepts pings before startup installs signal handlers. An
+    // app-owned request proves the server loop is ready before sending signals.
+    let mut stream = UnixStream::connect(&api_socket).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+    writeln!(
+        stream,
+        r#"{{"id":"ready","method":"session.snapshot","params":{{}}}}"#
+    )
+    .unwrap();
+    let mut response = String::new();
+    BufReader::new(stream).read_line(&mut response).unwrap();
+    let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+    assert_eq!(response["result"]["type"], "session_snapshot", "{response}");
     let pid = spawned.child.process_id().expect("server pid") as libc::pid_t;
 
     assert_eq!(unsafe { libc::kill(pid, libc::SIGHUP) }, 0);

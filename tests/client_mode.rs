@@ -746,6 +746,9 @@ fn sigwinch_refreshes_host_palette_without_resizing() {
         "client should query the initial palette: {:?}",
         read_output(&output)
     );
+    // WSL deliberately omits ANSI-palette queries. Refresh the same query
+    // capabilities used at startup; unit tests cover the platform's choice.
+    let queries_palette = read_output(&output).contains("\x1b]4;0;?\x1b\\");
 
     // Complete the startup query with a light palette. No appearance notification
     // is sent: this models a terminal whose colors are changed directly by OSC.
@@ -769,9 +772,10 @@ fn sigwinch_refreshes_host_palette_without_resizing() {
             wait_until(Duration::from_secs(5), Duration::from_millis(25), || {
                 let captured = read_output(&output);
                 let refreshed = &captured[watermark..];
-                refreshed.contains(queries) && refreshed.contains("\x1b]4;15;?\x1b\\")
+                refreshed.contains(queries)
+                    && (!queries_palette || refreshed.contains("\x1b]4;255;?\x1b\\"))
             }),
-            "SIGWINCH should query default colors and the ANSI palette without changing PTY size"
+            "SIGWINCH should repeat the supported host-color queries without changing PTY size"
         );
         writer
             .write_all(b"\x1b]10;rgb:eeee/eeee/eeee\x1b\\\x1b]11;rgb:1111/2222/3333\x1b\\")
