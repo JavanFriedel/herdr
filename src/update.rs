@@ -1946,7 +1946,9 @@ pub(crate) fn preview_channel_rejection_for_current_install() -> Option<&'static
 
 pub(crate) fn package_manager_channel_update_guidance_for_current_install() -> Option<&'static str>
 {
-    if is_homebrew_managed_install() {
+    if crate::fork::replaces_self_update() {
+        Some(crate::fork::update_guidance())
+    } else if is_homebrew_managed_install() {
         Some("Use `brew update && brew upgrade herdr` to update Homebrew installs.")
     } else if is_mise_managed_install() {
         Some("Use `mise upgrade herdr` to update mise installs.")
@@ -2107,6 +2109,10 @@ fn homebrew_cellar_keg_root(path: &Path) -> Option<PathBuf> {
 
 /// Manual self-update command (`herdr update`).
 pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
+    // The upstream release would replace the fork's patches; the fork updates itself.
+    if let Some(result) = crate::fork::self_update() {
+        return result.map(|()| Version::current());
+    }
     let channel = UpdateChannel::configured();
 
     if is_homebrew_managed_install() {

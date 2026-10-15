@@ -10,8 +10,9 @@
 # local build, so the remote must be the same platform with a compatible glibc.
 #
 # The first install keeps the upstream binary as herdr.upstream; every install keeps
-# the binary it replaced as herdr.prev. Do not run `herdr update` on a fork install: it
-# replaces the fork build with the official release. Restart the herdr client (quit and
+# the binary it replaced as herdr.prev, and records the built commit in
+# herdr.fork-commit. On a fork build, `herdr update` runs scripts/fork-update.sh
+# instead of installing the official release. Restart the herdr client (quit and
 # run herdr) to load client-side changes; detaching alone keeps the old client code.
 set -euo pipefail
 
@@ -68,13 +69,18 @@ EOF
   else
     cp "$built" "$HOME/.local/bin/herdr.new"
   fi
-  on_target <<'EOF'
+  {
+    printf 'commit=%q\n' "$commit"
+    cat <<'EOF'
 set -euo pipefail
 target="$HOME/.local/bin/herdr"
 chmod +x "$target.new"
 mv -f "$target.new" "$target"
+# scripts/fork-update.sh skips hosts whose recorded commit is already current
+printf '%s\n' "$commit" > "$target.fork-commit"
 echo "installed $("$target" --version) -> $target"
 EOF
+  } | on_target
   echo "[$where] fork build $commit"
 else
   on_target <<'EOF'
@@ -83,6 +89,7 @@ target="$HOME/.local/bin/herdr"
 [[ -x "$target.upstream" ]] || { echo "no $target.upstream to restore" >&2; exit 1; }
 cp "$target.upstream" "$target.new"
 mv -f "$target.new" "$target"
+rm -f "$target.fork-commit"
 echo "restored upstream $("$target" --version) -> $target"
 EOF
 fi
@@ -91,8 +98,13 @@ if $handoff; then
   on_target <<'EOF'
 set -euo pipefail
 target="$HOME/.local/bin/herdr"
+# the default session's server; a stopped one starts on the new binary next time
+if ! pgrep -u "$(id -u)" -f '(^|/)herdr server( |$)' >/dev/null; then
+  echo "no running herdr server to hand off"
+  exit 0
+fi
 "$target" server live-handoff --import-exe "$target"
+echo "server handed off"
 EOF
-  echo "[$where] server handed off"
 fi
 echo "[$where] quit and rerun herdr on that machine to load the new client"
