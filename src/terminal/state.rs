@@ -1392,7 +1392,7 @@ impl TerminalState {
             (
                 "herdr:claude",
                 "claude",
-                Some("clear" | "resume" | "compact")
+                Some("clear" | "resume" | "compact" | "fork")
             ) | (
                 "herdr:codex",
                 "codex",
@@ -4815,8 +4815,9 @@ mod tests {
 
     #[test]
     fn claude_lifecycle_session_ref_replaces_existing_session_ref() {
-        for session_start_source in ["clear", "resume", "compact"] {
+        for session_start_source in ["clear", "resume", "compact", "fork"] {
             let mut terminal = test_terminal();
+            terminal.set_detected_state(Some(Agent::Claude), AgentState::Idle);
             terminal
                 .set_agent_session_ref(
                     "herdr:claude".into(),
@@ -4848,6 +4849,181 @@ mod tests {
                     .map(|session| session.session_ref.value.as_str()),
                 Some(next_session.as_str()),
                 "{session_start_source} should store the replacement session"
+            );
+        }
+    }
+
+    #[test]
+    fn claude_session_replacement_rejects_older_or_equal_sequences() {
+        for session_start_source in ["resume", "fork"] {
+            for seq in [19, 20] {
+                let mut terminal = test_terminal();
+                terminal.set_detected_state(Some(Agent::Claude), AgentState::Idle);
+                terminal
+                    .set_agent_session_ref(
+                        "herdr:claude".into(),
+                        "claude".into(),
+                        crate::agent_resume::AgentSessionRef::id("claude-session"),
+                        Some(20),
+                    )
+                    .expect("initial session should be accepted");
+
+                assert!(terminal
+                    .set_agent_session_ref_for_session_start(
+                        "herdr:claude".into(),
+                        "claude".into(),
+                        crate::agent_resume::AgentSessionRef::id("replacement-session"),
+                        Some(seq),
+                        Some(session_start_source.into()),
+                    )
+                    .is_none());
+                assert_eq!(
+                    terminal.hook_report_sequences.get("herdr:claude"),
+                    Some(&20)
+                );
+                assert_eq!(
+                    terminal
+                        .persisted_agent_session
+                        .as_ref()
+                        .map(|session| session.session_ref.value.as_str()),
+                    Some("claude-session")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn claude_session_replacement_survives_absent_agent_and_recent_process_exit() {
+        for session_start_source in ["resume", "fork"] {
+            for process_exited in [false, true] {
+                let mut terminal = test_terminal();
+                terminal.set_detected_state(Some(Agent::Claude), AgentState::Idle);
+                terminal
+                    .set_agent_session_ref(
+                        "herdr:claude".into(),
+                        "claude".into(),
+                        crate::agent_resume::AgentSessionRef::id("claude-session"),
+                        Some(20),
+                    )
+                    .expect("initial session should be accepted");
+                let now = Instant::now();
+                terminal.set_detected_state_with_screen_signals_at(
+                    process_exited.then_some(Agent::Claude),
+                    AgentState::Unknown,
+                    false,
+                    false,
+                    false,
+                    process_exited,
+                    now,
+                );
+                assert_eq!(terminal.recent_agent_process_exit.is_some(), process_exited);
+                assert_eq!(
+                    terminal
+                        .suppressed_full_lifecycle_hook_reports
+                        .contains_key("herdr:claude"),
+                    process_exited
+                );
+
+                let mutation = terminal
+                    .set_agent_session_ref_for_session_start(
+                        "herdr:claude".into(),
+                        "claude".into(),
+                        crate::agent_resume::AgentSessionRef::id("replacement-session"),
+                        Some(21),
+                        Some(session_start_source.into()),
+                    )
+                    .expect("Claude identity reports do not require a foreground process");
+                assert!(mutation.session_ref_changed);
+                assert_eq!(
+                    terminal
+                        .persisted_agent_session
+                        .as_ref()
+                        .map(|session| session.session_ref.value.as_str()),
+                    Some("replacement-session")
+                );
+
+                terminal.set_detected_state_with_screen_signals_at(
+                    Some(Agent::Claude),
+                    AgentState::Idle,
+                    false,
+                    true,
+                    false,
+                    false,
+                    now + Duration::from_millis(1),
+                );
+                assert!(terminal.recent_agent_process_exit.is_none());
+                assert!(terminal.hook_authority.is_none());
+                assert_eq!(
+                    terminal
+                        .persisted_agent_session
+                        .as_ref()
+                        .map(|session| session.session_ref.value.as_str()),
+                    Some("replacement-session")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn claude_session_replacement_does_not_replay_after_a_later_process_exit() {
+        for session_start_source in ["resume", "fork"] {
+            let mut terminal = test_terminal();
+            terminal.set_detected_state(Some(Agent::Claude), AgentState::Idle);
+            terminal
+                .set_agent_session_ref_for_session_start(
+                    "herdr:claude".into(),
+                    "claude".into(),
+                    crate::agent_resume::AgentSessionRef::id("replacement-session"),
+                    Some(21),
+                    Some(session_start_source.into()),
+                )
+                .expect("session report should be accepted before exit");
+            let now = Instant::now();
+            terminal.set_detected_state_with_screen_signals_at(
+                Some(Agent::Claude),
+                AgentState::Unknown,
+                false,
+                false,
+                false,
+                true,
+                now,
+            );
+            terminal.set_detected_state_with_screen_signals_at(
+                Some(Agent::Claude),
+                AgentState::Idle,
+                false,
+                true,
+                false,
+                false,
+                now + Duration::from_millis(1),
+            );
+
+            // A later exit releases identity; Claude has no queued lifecycle report to replay.
+            assert!(terminal.persisted_agent_session.is_none());
+        }
+    }
+
+    #[test]
+    fn fork_session_replacement_is_scoped_to_supported_integrations() {
+        for (source, agent, expected) in [
+            ("herdr:claude", "claude", true),
+            ("herdr:pi", "pi", true),
+            ("herdr:omp", "omp", true),
+            ("herdr:codex", "codex", false),
+            ("herdr:qwen", "qwen", false),
+            ("herdr:opencode", "opencode", false),
+            ("herdr:grok", "grok", false),
+            ("custom:claude", "claude", false),
+            ("herdr:claude", "codex", false),
+        ] {
+            assert_eq!(
+                TerminalState::session_report_allows_session_replacement(
+                    source,
+                    agent,
+                    Some("fork")
+                ),
+                expected,
+                "{source}/{agent} fork replacement policy"
             );
         }
     }
@@ -5469,7 +5645,7 @@ mod tests {
 
     #[test]
     fn foreground_agent_session_replaces_stale_different_owner_session_ref() {
-        for session_start_source in ["resume", "startup"] {
+        for session_start_source in ["resume", "startup", "fork"] {
             let mut terminal = test_terminal();
             terminal.set_persisted_agent_session(crate::agent_resume::PersistedAgentSession {
                 source: "herdr:codex".into(),
@@ -5539,7 +5715,7 @@ mod tests {
 
     #[test]
     fn different_owner_session_ref_requires_matching_detected_agent() {
-        for session_start_source in ["startup", "resume"] {
+        for session_start_source in ["startup", "resume", "fork"] {
             for detected_agent in [None, Some(Agent::Codex)] {
                 let mut terminal = test_terminal();
                 terminal.set_persisted_agent_session(crate::agent_resume::PersistedAgentSession {
