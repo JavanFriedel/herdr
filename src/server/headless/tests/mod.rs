@@ -3657,6 +3657,40 @@ async fn client_shell_mouse_motion_delivers_without_render_when_foreground() {
 }
 
 #[tokio::test]
+async fn direct_terminal_input_arms_interactive_render_window() {
+    let mut server = test_headless_server();
+    let workspace = crate::workspace::Workspace::test_new("direct-terminal");
+    let pane_id = workspace.tabs[0].root_pane;
+    let runtime_id = workspace.terminal_id(pane_id).unwrap().clone();
+    let terminal_id = runtime_id.to_string();
+    server.app.state.workspaces = vec![workspace];
+    server.app.state.ensure_test_terminals();
+    let (runtime, mut input_rx) =
+        crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(80, 24, 0, b"", 4);
+    server.app.terminal_runtimes.insert(runtime_id, runtime);
+    let (client_tx, _control_rx, _render_rx) = test_client_writer();
+    server.clients.insert(
+        1,
+        ClientConnection::new_with_mode(
+            ClientConnectionMode::TerminalAttach { terminal_id },
+            (80, 24),
+            crate::kitty_graphics::HostCellSize::default(),
+            1,
+            RenderEncoding::TerminalAnsi,
+            Some(client_tx),
+        ),
+    );
+
+    server.handle_server_event(ServerEvent::ClientInput {
+        client_id: 1,
+        data: b"Z".to_vec(),
+    });
+
+    assert_eq!(input_rx.try_recv().unwrap(), Bytes::from_static(b"Z"));
+    assert!(server.interactive_input_deadlines.contains_key(&pane_id));
+}
+
+#[tokio::test]
 async fn client_shell_split_echo_bypasses_cadence_with_bounded_visible_burst() {
     let mut server = test_headless_server();
     let mut input_rx = install_focused_test_runtime(&mut server, b"PS> old");

@@ -2097,10 +2097,26 @@ impl HeadlessServer {
                 else {
                     return false;
                 };
-                if let Some(runtime) = self.runtime_for_terminal_id_string(terminal_id) {
-                    if let Err(err) = apply_terminal_attach_input(runtime, data) {
-                        warn!(client_id, terminal_id = %terminal_id, err = %err);
-                    }
+                let attached = terminal_id.clone();
+                let Some(runtime) = self.runtime_for_terminal_id_string(&attached) else {
+                    return true;
+                };
+                if let Err(err) = apply_terminal_attach_input(runtime, data) {
+                    warn!(client_id, terminal_id = %attached, err = %err);
+                    return true;
+                }
+                // Typing in a direct terminal repaints as early as typing in the shell client.
+                let pane_id = self
+                    .app
+                    .state
+                    .workspaces
+                    .iter()
+                    .flat_map(|workspace| &workspace.tabs)
+                    .flat_map(|tab| &tab.panes)
+                    .find(|(_, pane)| pane.attached_terminal_id.as_str() == attached)
+                    .map(|(&pane_id, _)| pane_id);
+                if let Some(pane_id) = pane_id {
+                    self.note_interactive_input(pane_id, Instant::now());
                 }
                 true
             }
