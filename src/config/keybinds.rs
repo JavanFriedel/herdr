@@ -345,8 +345,13 @@ pub struct NavigateKeybinds {
     pub pane_down: ActionKeybinds,
     pub pane_up: ActionKeybinds,
     pub pane_right: ActionKeybinds,
-    pub tab_previous: ActionKeybinds,
-    pub tab_next: ActionKeybinds,
+}
+
+/// Tab cursor bindings are independent of workspace/pane and agent navigation.
+#[derive(Debug, Clone)]
+pub struct TabNavigateKeybinds {
+    pub previous: ActionKeybinds,
+    pub next: ActionKeybinds,
 }
 
 /// Parsed keybinds for agent navigate mode. Checked separately from navigate mode,
@@ -362,6 +367,7 @@ pub struct AgentNavigateKeybinds {
 pub struct Keybinds {
     pub navigate: NavigateKeybinds,
     pub agent_navigate: AgentNavigateKeybinds,
+    pub tab_navigate: TabNavigateKeybinds,
     pub help: ActionKeybinds,
     pub settings: ActionKeybinds,
     pub new_workspace: ActionKeybinds,
@@ -372,6 +378,7 @@ pub struct Keybinds {
     pub close_workspace: ActionKeybinds,
     pub workspace_picker: ActionKeybinds,
     pub agent_picker: ActionKeybinds,
+    pub tab_picker: ActionKeybinds,
     pub goto: ActionKeybinds,
     pub detach: ActionKeybinds,
     pub reload_config: ActionKeybinds,
@@ -532,6 +539,15 @@ impl Config {
         let mut agent_navigate_registry = BindingRegistry::new(prefix_keys.clone(), prefix_source);
         agent_navigate_registry.reserve_prefix_keys("keys.prefix", prefix_source);
         reserve_agent_navigate_runtime_keys(&mut agent_navigate_registry);
+        let mut tab_navigate_registry = BindingRegistry::new(prefix_keys.clone(), prefix_source);
+        tab_navigate_registry.reserve_prefix_keys("keys.prefix", prefix_source);
+        for code in [KeyCode::Esc, KeyCode::Enter, KeyCode::Left, KeyCode::Right] {
+            tab_navigate_registry.reserve_direct(
+                (code, KeyModifiers::empty()),
+                "tab navigate reserved keys",
+                BindingSource::Default,
+            );
+        }
         let prefix = prefix_keys;
 
         macro_rules! empty_action {
@@ -548,12 +564,14 @@ impl Config {
                 pane_down: empty_action!(),
                 pane_up: empty_action!(),
                 pane_right: empty_action!(),
-                tab_previous: empty_action!(),
-                tab_next: empty_action!(),
             },
             agent_navigate: AgentNavigateKeybinds {
                 up: empty_action!(),
                 down: empty_action!(),
+            },
+            tab_navigate: TabNavigateKeybinds {
+                previous: empty_action!(),
+                next: empty_action!(),
             },
             help: empty_action!(),
             settings: empty_action!(),
@@ -565,6 +583,7 @@ impl Config {
             close_workspace: empty_action!(),
             workspace_picker: empty_action!(),
             agent_picker: empty_action!(),
+            tab_picker: empty_action!(),
             goto: empty_action!(),
             detach: empty_action!(),
             reload_config: empty_action!(),
@@ -685,12 +704,24 @@ impl Config {
             apply_navigate!(keybinds.navigate.pane_down, navigate_pane_down, source);
             apply_navigate!(keybinds.navigate.pane_up, navigate_pane_up, source);
             apply_navigate!(keybinds.navigate.pane_right, navigate_pane_right, source);
-            apply_navigate!(
-                keybinds.navigate.tab_previous,
-                navigate_tab_previous,
-                source
-            );
-            apply_navigate!(keybinds.navigate.tab_next, navigate_tab_next, source);
+            if field_source!(navigate_tab_previous) == source {
+                keybinds.tab_navigate.previous = parse_navigate_bindings(
+                    "keys.navigate_tab_previous",
+                    &self.keys.navigate_tab_previous,
+                    &mut tab_navigate_registry,
+                    &mut diagnostics,
+                    source,
+                );
+            }
+            if field_source!(navigate_tab_next) == source {
+                keybinds.tab_navigate.next = parse_navigate_bindings(
+                    "keys.navigate_tab_next",
+                    &self.keys.navigate_tab_next,
+                    &mut tab_navigate_registry,
+                    &mut diagnostics,
+                    source,
+                );
+            }
             if field_source!(navigate_agent_up) == source {
                 keybinds.agent_navigate.up = parse_navigate_bindings(
                     "keys.navigate_agent_up",
@@ -719,6 +750,7 @@ impl Config {
             apply_action!(keybinds.close_workspace, close_workspace, source);
             apply_action!(keybinds.workspace_picker, workspace_picker, source);
             apply_action!(keybinds.agent_picker, agent_picker, source);
+            apply_action!(keybinds.tab_picker, tab_picker, source);
             apply_action!(keybinds.goto, goto, source);
             apply_action!(keybinds.detach, detach, source);
             apply_action!(keybinds.reload_config, reload_config, source);
@@ -2153,6 +2185,65 @@ navigate_pane_down = "ctrl+\u00f6"
         // German layout: "\u{f6}" on the physical `;` key.
         let key = crate::input::parse_terminal_key_sequence("\x1b[246::59;5u").unwrap();
         assert!(keybinds.navigate.pane_down.matches_direct_key(&key));
+    }
+
+    #[test]
+    fn tab_navigation_bindings_do_not_displace_workspace_pane_bindings() {
+        let config = Config::default();
+        let keybinds = config.keybinds();
+        for (key, pane, tab) in [
+            (
+                'h',
+                &keybinds.navigate.pane_left,
+                &keybinds.tab_navigate.previous,
+            ),
+            (
+                'l',
+                &keybinds.navigate.pane_right,
+                &keybinds.tab_navigate.next,
+            ),
+        ] {
+            let key = TerminalKey::new(KeyCode::Char(key), KeyModifiers::empty());
+            assert!(pane.matches_direct_key(&key));
+            assert!(tab.matches_direct_key(&key));
+        }
+        assert!(keybinds
+            .tab_picker
+            .matches_prefix(&KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty())));
+        assert!(config.collect_diagnostics().is_empty());
+    }
+
+    #[test]
+    fn tab_navigation_conflicts_and_reserved_keys_are_scoped_to_its_mode() {
+        let config: Config =
+            toml::from_str("[keys]\nnavigate_tab_previous = \"p\"\nnavigate_tab_next = \"p\"\n")
+                .unwrap();
+        let keybinds = config.keybinds();
+        assert!(!keybinds.tab_navigate.previous.bindings.is_empty());
+        assert!(keybinds.tab_navigate.next.bindings.is_empty());
+        assert!(!keybinds.navigate.pane_left.bindings.is_empty());
+        assert!(config
+            .collect_diagnostics()
+            .iter()
+            .any(|message| message.contains("disabled keys.navigate_tab_next")));
+
+        let config: Config = toml::from_str("[keys]\nnavigate_tab_previous = [\"esc\", \"enter\", \"left\", \"right\", \"ctrl+b\"]\n").unwrap();
+        assert!(config.keybinds().tab_navigate.previous.bindings.is_empty());
+        assert!(!config.keybinds().tab_navigate.next.bindings.is_empty());
+    }
+
+    #[test]
+    fn tab_navigation_profiles_round_trip_default_and_custom_bindings() {
+        for config in [Config::default(), toml::from_str("[keys]\ntab_picker = \"prefix+alt+t\"\nnavigate_tab_previous = \"p\"\nnavigate_tab_next = \"n\"\n").unwrap()] {
+            let profile = config.local_keybindings_profile_toml().unwrap();
+            let restored: Config = toml::from_str(&profile).unwrap();
+            let before = config.keybinds();
+            let after = restored.keybinds();
+            assert_eq!(before.tab_picker, after.tab_picker);
+            assert_eq!(before.tab_navigate.previous, after.tab_navigate.previous);
+            assert_eq!(before.tab_navigate.next, after.tab_navigate.next);
+            assert_eq!(before.navigate.pane_left, after.navigate.pane_left);
+        }
     }
 
     #[test]

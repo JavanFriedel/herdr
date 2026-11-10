@@ -134,6 +134,7 @@ impl ClientShellState {
             endpoint.pending_agent_view_projection = None;
             endpoint.agent_view_projection_supported = false;
         }
+        self.reconcile_tab_navigation();
     }
 
     pub(crate) fn set_endpoint_status(
@@ -157,6 +158,7 @@ impl ClientShellState {
         {
             endpoint.status = status;
         }
+        self.reconcile_tab_navigation();
     }
 
     pub(crate) fn mark_endpoint_disconnected(&mut self, endpoint_id: &ClientEndpointId) {

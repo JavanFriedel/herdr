@@ -1028,91 +1028,30 @@ fn kitty_ctrl_bracket_cancels_a_blocked_foreign_preview() {
 }
 
 #[test]
-fn navigate_tab_bindings_cycle_tabs_and_keep_navigation_open() {
-    use crate::api::schema::Method;
+fn workspace_navigation_keeps_pane_h_l_when_tab_navigation_uses_the_same_keys() {
+    use crate::api::schema::{Method, PaneDirection};
 
-    let config: Config =
-        toml::from_str("[keys]\nnavigate_tab_previous = \"h\"\nnavigate_tab_next = \"l\"\n")
-            .unwrap();
-    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
-    let mut projected = workspaces(2);
-    projected.tabs = (1..=3)
-        .map(|number| {
-            let mut tab = projected.tabs[0].clone();
-            tab.tab_id = format!("tab_{number}");
-            tab.number = number;
-            tab.focused = number == 1;
-            tab
-        })
-        .collect();
-    state.set_snapshot(Box::new(projected));
-    state.set_pane_surface(surface());
-    state.compose(100, 28).unwrap();
-    enter_navigation(&mut state);
-
-    for (key, expected) in [(b'l', "tab_2"), (b'h', "tab_3")] {
-        let outcome = state.handle_input_bytes(&[key]);
-        let [ClientShellAction::Endpoint { request, .. }] = outcome.actions.as_slice() else {
-            panic!("expected a tab focus request for {key:?}");
-        };
-        let Method::TabFocus(target) = &request.method else {
-            panic!("expected TabFocus, got {:?}", request.method);
-        };
-        assert_eq!(target.tab_id, expected);
-        assert_eq!(state.mode, ClientShellMode::Navigate);
-    }
-}
-
-#[test]
-fn navigate_tab_bindings_follow_the_highlighted_workspace() {
-    assert_navigate_tab_bindings_follow_the_highlighted_workspace(false);
-}
-
-#[test]
-fn navigate_tab_bindings_follow_the_highlighted_workspace_on_a_report_all_host() {
-    assert_navigate_tab_bindings_follow_the_highlighted_workspace(true);
-}
-
-fn assert_navigate_tab_bindings_follow_the_highlighted_workspace(report_all: bool) {
-    use crate::api::schema::Method;
-
-    let config: Config = toml::from_str(
-        "[keys]\nnavigate_workspace_up = \"k\"\nnavigate_workspace_down = \"j\"\n\
-         navigate_tab_previous = \"h\"\nnavigate_tab_next = \"l\"\n",
-    )
-    .unwrap();
-    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
-    let mut projected = workspaces(2);
-    projected.workspaces[1].active_tab_id = "tab_2a".into();
-    let mut tabs = vec![projected.tabs[0].clone()];
-    for (tab_id, number) in [("tab_2a", 1), ("tab_2b", 2), ("tab_2c", 3)] {
-        let mut tab = projected.tabs[0].clone();
-        tab.tab_id = tab_id.into();
-        tab.workspace_id = "ws_2".into();
-        tab.number = number;
-        tab.focused = false;
-        tabs.push(tab);
-    }
-    projected.tabs = tabs;
-    state.set_snapshot(Box::new(projected));
-    state.set_pane_surface(surface());
-    state.set_host_reports_key_releases(report_all);
-    state.set_host_reports_all_keys(report_all);
-    state.compose(100, 28).unwrap();
-    enter_navigation(&mut state);
-    preview_key(&mut state, b"j");
-    assert_selected(&state, &ClientEndpointId::Local, "ws_2");
-
-    for (key, expected) in [(b'l', "tab_2b"), (b'h', "tab_2c")] {
-        let outcome = state.handle_input_bytes(&[key]);
-        let [ClientShellAction::Endpoint { request, .. }] = outcome.actions.as_slice() else {
-            panic!("expected one tab focus request for {key:?}");
-        };
-        let Method::TabFocus(target) = &request.method else {
-            panic!("expected TabFocus, got {:?}", request.method);
-        };
-        assert_eq!(target.tab_id, expected);
-        assert_eq!(state.mode, ClientShellMode::Navigate);
-        assert_selected(&state, &ClientEndpointId::Local, "ws_2");
+    for report_all in [false, true] {
+        let config: Config =
+            toml::from_str("[keys]\nnavigate_tab_previous = \"h\"\nnavigate_tab_next = \"l\"\n")
+                .unwrap();
+        let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+        state.set_snapshot(Box::new(workspaces(2)));
+        state.set_pane_surface(surface());
+        state.set_host_reports_key_releases(report_all);
+        state.set_host_reports_all_keys(report_all);
+        state.compose(100, 28).unwrap();
+        enter_navigation(&mut state);
+        for (key, direction) in [(b'h', PaneDirection::Left), (b'l', PaneDirection::Right)] {
+            let outcome = state.handle_input_bytes(&[key]);
+            let [ClientShellAction::Endpoint { request, .. }] = outcome.actions.as_slice() else {
+                panic!("expected one pane focus request for {key:?}");
+            };
+            assert!(
+                matches!(&request.method, Method::PaneFocusDirection(params) if params.direction == direction)
+            );
+            assert_eq!(state.mode, ClientShellMode::Navigate);
+            assert!(state.navigate_tab.is_none());
+        }
     }
 }

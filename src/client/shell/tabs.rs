@@ -13,6 +13,7 @@ pub(crate) fn render_tab_bar(
     tab_scroll: &mut usize,
     reveal_focused_tab: &mut bool,
     tab_drag_insert_index: Option<usize>,
+    selected_tab_id: Option<&str>,
     hits: &mut ShellHitMap,
 ) {
     let palette = &config.palette;
@@ -55,7 +56,10 @@ pub(crate) fn render_tab_bar(
     if !overflow {
         *tab_scroll = 0;
     } else if *reveal_focused_tab {
-        if let Some(focused) = tabs.iter().position(|tab| tab.focused) {
+        if let Some(focused) = tabs
+            .iter()
+            .position(|tab| selected_tab_id.map_or(tab.focused, |id| tab.tab_id == id))
+        {
             *tab_scroll = centered_tab_scroll(focused, &desired_widths, available).min(max_scroll);
         }
     } else {
@@ -104,7 +108,12 @@ pub(crate) fn render_tab_bar(
             break;
         }
         let rect = Rect::new(x, area.y, width, 1);
-        let style = if tab.focused {
+        let style = if selected_tab_id == Some(tab.tab_id.as_str()) {
+            Style::default()
+                .fg(palette.text)
+                .bg(super::sidebar::workspace_selection_background(palette))
+                .add_modifier(Modifier::BOLD)
+        } else if tab.focused {
             let base = Style::default()
                 .fg(panel_contrast_fg(palette))
                 .bg(palette.accent);

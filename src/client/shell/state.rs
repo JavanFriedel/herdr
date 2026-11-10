@@ -273,6 +273,7 @@ pub(super) enum ClientShellMode {
     Prefix,
     Navigate,
     AgentNavigate,
+    TabNavigate,
     Resize,
     Copy,
 }
@@ -903,6 +904,7 @@ pub(crate) struct ClientShellState {
     pub(super) mode: ClientShellMode,
     pub(super) navigate_workspace_id: Option<WorkspaceNavigationTarget>,
     pub(super) navigate_agent: Option<AgentNavigationTarget>,
+    pub(super) navigate_tab: Option<TabNavigationTarget>,
     pub(super) pending_workspace_highlight: Option<PendingWorkspaceHighlight>,
     pub(super) reveal_navigation_workspace: bool,
     pub(super) overlay: Option<ClientShellOverlay>,
@@ -1078,6 +1080,7 @@ impl ClientShellState {
             mode: ClientShellMode::Terminal,
             navigate_workspace_id: None,
             navigate_agent: None,
+            navigate_tab: None,
             pending_workspace_highlight: None,
             reveal_navigation_workspace: false,
             overlay,
@@ -1222,13 +1225,19 @@ impl ClientShellState {
     }
 
     pub(super) fn layout(&self, cols: u16, rows: u16) -> ClientShellLayout {
-        self.config.layout(
+        let mut layout = self.config.layout(
             cols,
             rows,
             self.sidebar_collapsed,
             self.focused_tab_count(),
             self.sidebar_width,
-        )
+        );
+        if self.mode == ClientShellMode::TabNavigate && layout.mobile_header.height > 1 {
+            // Reuse the mobile summary row: browsing tabs must not resize the live pane.
+            layout.tab_bar = Rect::new(0, layout.mobile_header.bottom() - 1, cols, 1);
+            layout.mobile_header.height -= 1;
+        }
+        layout
     }
 
     pub(crate) fn surface_size(&self, cols: u16, rows: u16) -> ClientSurfaceSize {
@@ -1273,6 +1282,7 @@ impl ClientShellState {
         self.endpoint_error_deadline = None;
         self.navigate_workspace_id = None;
         self.pending_workspace_highlight = None;
+        self.navigate_tab = None;
         self.overlay = self
             .config
             .startup_onboarding
@@ -1408,11 +1418,13 @@ impl ClientShellState {
                     ClientShellMode::Prefix
                         | ClientShellMode::Navigate
                         | ClientShellMode::AgentNavigate
+                        | ClientShellMode::TabNavigate
                         | ClientShellMode::Resize
                 )
             {
                 self.mode = ClientShellMode::Terminal;
                 self.navigate_agent = None;
+                self.navigate_tab = None;
             }
         }
         let tab_layout_changed = self.snapshot.as_deref().is_none_or(|current| {
@@ -1593,6 +1605,7 @@ impl ClientShellState {
             }
         }
         self.snapshot = Some(snapshot);
+        self.reconcile_tab_navigation();
         self.reconcile_pending_workspace_highlight();
         let pending_surface = self.pending_pane_surface.take();
         if let Some(surface) = pending_surface {
@@ -1685,6 +1698,7 @@ impl ClientShellState {
             }
             self.mode = ClientShellMode::Terminal;
             self.navigate_workspace_id = None;
+            self.navigate_tab = None;
             if !matches!(
                 self.overlay.as_ref(),
                 Some(ClientShellOverlay::Onboarding | ClientShellOverlay::ProductAnnouncement(_))

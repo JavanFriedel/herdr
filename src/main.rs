@@ -152,6 +152,7 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 # open_notification_target = "prefix+o"
 # workspace_picker = "prefix+w"
 # agent_picker = "prefix+a"          # agent navigation: j/k move, enter focuses, esc cancels
+# tab_picker = "prefix+t"            # tab navigation: h/l move, enter focuses, esc cancels
 # goto = "prefix+g"
 # new_workspace = "prefix+shift+n"
 # new_worktree = "prefix+shift+g"
@@ -203,8 +204,8 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 # navigate_pane_down = "j"
 # navigate_pane_up = "k"
 # navigate_pane_right = "l"     # right arrow always focuses the pane to the right
-# navigate_tab_previous = ""    # optional, e.g. "h" (rebind navigate_pane_left first)
-# navigate_tab_next = ""        # optional, e.g. "l" (rebind navigate_pane_right first)
+# navigate_tab_previous = "h"   # tab navigate mode only; left arrow always moves back
+# navigate_tab_next = "l"       # tab navigate mode only; right arrow always moves forward
 
 # Agent navigate-mode movement (opened with agent_picker). Checked separately from
 # navigate mode. Do not include prefix+, esc, enter, or 1..9 here.

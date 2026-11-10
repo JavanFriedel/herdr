@@ -46,9 +46,12 @@ Tabs:
 | Action | Key |
 | --- | --- |
 | Next / previous tab | `prefix+n` / `prefix+p` |
+| Tab navigation (highlight, then confirm) | `prefix+t` |
 | Jump to tab 1–9 | `prefix+1..9` |
 | Rename tab | `prefix+shift+t` |
 | Close tab | `prefix+shift+x` |
+
+Tab navigation highlights the current workspace's tabs with `h/l` or Left/Right. The visible tab does not change until you press Enter; Esc, Ctrl+[ or the prefix cancels. The highlight scrolls into view when the tab bar overflows. Configure `keys.tab_picker`, `keys.navigate_tab_previous`, and `keys.navigate_tab_next` to change these bindings. The fork's tab movement keys no longer run inside workspace navigation (`prefix+w`), so they do not replace its pane `h/l` bindings. Direct next/previous tab shortcuts and mouse clicks still switch immediately.
 
 Workspaces and session:
 

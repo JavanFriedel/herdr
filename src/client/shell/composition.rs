@@ -76,6 +76,11 @@ impl ClientShellState {
                 .filter(|_| valid_navigation_target)
                 .or_else(|| pending_workspace_highlight.map(|pending| &pending.target)),
             selected_agent: self.navigate_agent.as_ref().filter(|_| agent_navigating),
+            selected_tab_id: self
+                .navigate_tab
+                .as_ref()
+                .filter(|_| self.mode == ClientShellMode::TabNavigate)
+                .map(|target| target.tab_id.as_str()),
             reveal_navigation_workspace: &mut self.reveal_navigation_workspace,
             dragged_workspace_id: None,
             workspace_drop_indicator_row: None,
@@ -234,6 +239,11 @@ impl ClientShellState {
                     .filter(|_| valid_navigation_target)
                     .or_else(|| pending_workspace_highlight.map(|pending| &pending.target)),
                 selected_agent: self.navigate_agent.as_ref().filter(|_| agent_navigating),
+                selected_tab_id: self
+                    .navigate_tab
+                    .as_ref()
+                    .filter(|_| self.mode == ClientShellMode::TabNavigate)
+                    .map(|target| target.tab_id.as_str()),
                 reveal_navigation_workspace: &mut self.reveal_navigation_workspace,
                 dragged_workspace_id,
                 workspace_drop_indicator_row,
@@ -312,6 +322,7 @@ impl ClientShellState {
             self.hits.pane_splits.clear();
         }
         let mode_bar_area = if layout.mobile_header.is_empty()
+            && self.mode != ClientShellMode::TabNavigate
             && self.config.tab_bar_position == TabBarPositionConfig::Bottom
             && !layout.tab_bar.is_empty()
         {

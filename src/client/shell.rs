@@ -3,6 +3,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 mod actions;
 mod agent_navigation;
 use agent_navigation::AgentNavigationTarget;
+mod tab_navigation;
+use tab_navigation::TabNavigationTarget;
 mod agent_sidebar;
 mod aggregate_navigation;
 mod machine_diagnostics;

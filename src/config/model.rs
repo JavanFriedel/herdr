@@ -358,6 +358,8 @@ pub struct KeysConfig {
     /// Open agent navigation: move through the agent list and press enter to focus one.
     /// Default: "prefix+a"
     pub agent_picker: BindingConfig,
+    /// Open tab navigation: highlight a tab and press Enter to focus it. Default: "prefix+t".
+    pub tab_picker: BindingConfig,
     /// Open the session navigator. Default: "prefix+g"
     pub goto: BindingConfig,
     /// Move workspace selection up in navigate mode. Default: "up".
@@ -372,9 +374,9 @@ pub struct KeysConfig {
     pub navigate_pane_up: BindingConfig,
     /// Focus the pane to the right in navigate mode. Default: "l". Right arrow is always an alias.
     pub navigate_pane_right: BindingConfig,
-    /// Switch to the previous tab in navigate mode without leaving it. Default: unbound.
+    /// Highlight the previous tab in tab navigate mode. Default: "h". Left arrow is always an alias.
     pub navigate_tab_previous: BindingConfig,
-    /// Switch to the next tab in navigate mode without leaving it. Default: unbound.
+    /// Highlight the next tab in tab navigate mode. Default: "l". Right arrow is always an alias.
     pub navigate_tab_next: BindingConfig,
     /// Move agent selection up in agent navigate mode. Default: "k". Up arrow is always an alias.
     pub navigate_agent_up: BindingConfig,
@@ -505,6 +507,8 @@ pub(crate) struct KeysConfigOverlay {
     workspace_picker: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     agent_picker: Option<BindingConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tab_picker: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     goto: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -674,6 +678,7 @@ impl<'de> Deserialize<'de> for KeysConfig {
         apply_field!(close_workspace);
         apply_field!(workspace_picker);
         apply_field!(agent_picker);
+        apply_field!(tab_picker);
         apply_field!(goto);
         apply_field!(navigate_workspace_up);
         apply_field!(navigate_workspace_down);
@@ -784,6 +789,7 @@ impl KeysConfig {
         copy_effective_action_field!(close_workspace, keybinds.close_workspace);
         copy_effective_action_field!(workspace_picker, keybinds.workspace_picker);
         copy_effective_action_field!(agent_picker, keybinds.agent_picker);
+        copy_effective_action_field!(tab_picker, keybinds.tab_picker);
         copy_effective_action_field!(goto, keybinds.goto);
         copy_effective_action_field!(navigate_workspace_up, keybinds.navigate.workspace_up);
         copy_effective_action_field!(navigate_workspace_down, keybinds.navigate.workspace_down);
@@ -791,8 +797,8 @@ impl KeysConfig {
         copy_effective_action_field!(navigate_pane_down, keybinds.navigate.pane_down);
         copy_effective_action_field!(navigate_pane_up, keybinds.navigate.pane_up);
         copy_effective_action_field!(navigate_pane_right, keybinds.navigate.pane_right);
-        copy_effective_action_field!(navigate_tab_previous, keybinds.navigate.tab_previous);
-        copy_effective_action_field!(navigate_tab_next, keybinds.navigate.tab_next);
+        copy_effective_action_field!(navigate_tab_previous, keybinds.tab_navigate.previous);
+        copy_effective_action_field!(navigate_tab_next, keybinds.tab_navigate.next);
         copy_effective_action_field!(navigate_agent_up, keybinds.agent_navigate.up);
         copy_effective_action_field!(navigate_agent_down, keybinds.agent_navigate.down);
         copy_effective_action_field!(detach, keybinds.detach);
@@ -1161,6 +1167,7 @@ impl Default for KeysConfig {
             close_workspace: BindingConfig::one("prefix+shift+d"),
             workspace_picker: BindingConfig::one("prefix+w"),
             agent_picker: BindingConfig::one("prefix+a"),
+            tab_picker: BindingConfig::one("prefix+t"),
             goto: BindingConfig::one("prefix+g"),
             navigate_workspace_up: BindingConfig::one("up"),
             navigate_workspace_down: BindingConfig::one("down"),
@@ -1168,8 +1175,8 @@ impl Default for KeysConfig {
             navigate_pane_down: BindingConfig::one("j"),
             navigate_pane_up: BindingConfig::one("k"),
             navigate_pane_right: BindingConfig::one("l"),
-            navigate_tab_previous: BindingConfig::empty(),
-            navigate_tab_next: BindingConfig::empty(),
+            navigate_tab_previous: BindingConfig::one("h"),
+            navigate_tab_next: BindingConfig::one("l"),
             navigate_agent_up: BindingConfig::one("k"),
             navigate_agent_down: BindingConfig::one("j"),
             detach: BindingConfig::one("prefix+q"),

@@ -149,6 +149,7 @@ impl ClientShellState {
                     return;
                 }
                 if action == crate::input::KeybindAction::WorkspacePicker {
+                    self.navigate_tab = None;
                     self.pending_workspace_highlight = None;
                     self.mobile_switcher_scroll = 0;
                     self.reveal_mobile_workspace = false;
@@ -159,7 +160,13 @@ impl ClientShellState {
                     return;
                 }
                 if action == crate::input::KeybindAction::AgentPicker {
+                    self.navigate_tab = None;
                     self.enter_agent_navigation();
+                    outcome.repaint = true;
+                    return;
+                }
+                if action == crate::input::KeybindAction::TabPicker {
+                    self.enter_tab_navigation();
                     outcome.repaint = true;
                     return;
                 }

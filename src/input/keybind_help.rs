@@ -119,6 +119,21 @@ pub(crate) fn keybind_help_groups(
             ],
         ),
         (
+            "tab navigate mode",
+            vec![
+                entry("esc / prefix", "back to terminal"),
+                entry(
+                    format!(
+                        "{} / {} / left / right",
+                        binding_label(&keybinds.tab_navigate.previous),
+                        binding_label(&keybinds.tab_navigate.next)
+                    ),
+                    "highlight tab",
+                ),
+                entry("enter", "open highlighted tab"),
+            ],
+        ),
+        (
             "workspaces / tabs",
             vec![
                 entry(
@@ -126,6 +141,7 @@ pub(crate) fn keybind_help_groups(
                     "workspace navigation",
                 ),
                 entry(binding_label(&keybinds.agent_picker), "agent navigation"),
+                entry(binding_label(&keybinds.tab_picker), "tab navigation"),
                 entry(binding_label(&keybinds.goto), "session navigator"),
                 entry(binding_label(&keybinds.new_workspace), "new workspace"),
                 entry(binding_label(&keybinds.new_worktree), "new worktree"),

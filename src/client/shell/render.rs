@@ -135,6 +135,24 @@ pub(super) fn render_mode_bar(
                     (" jump".to_owned(), base),
                 ]);
             }
+            ClientShellMode::TabNavigate => {
+                let bindings = &keybinds.keybinds.tab_navigate;
+                segments.extend([
+                    (" TABS ".to_owned(), mode_style),
+                    (" esc back  ".to_owned(), base),
+                    (
+                        format!(
+                            "{}/{} / ←/→",
+                            bindings.previous.label().unwrap_or_else(|| "unset".into()),
+                            bindings.next.label().unwrap_or_else(|| "unset".into())
+                        ),
+                        key,
+                    ),
+                    (" tab  ".to_owned(), base),
+                    ("enter".to_owned(), key),
+                    (" focus".to_owned(), base),
+                ]);
+            }
             ClientShellMode::Resize => {
                 segments.extend([
                     (" RESIZE ".to_owned(), mode_style),
@@ -272,6 +290,7 @@ pub(super) struct ShellRenderState<'a> {
     pub(super) tab_drag_insert_index: Option<usize>,
     pub(super) selected_workspace_id: Option<&'a WorkspaceNavigationTarget>,
     pub(super) selected_agent: Option<&'a AgentNavigationTarget>,
+    pub(super) selected_tab_id: Option<&'a str>,
     pub(super) reveal_navigation_workspace: &'a mut bool,
     pub(super) dragged_workspace_id: Option<&'a str>,
     pub(super) workspace_drop_indicator_row: Option<u16>,
@@ -355,6 +374,7 @@ pub(super) fn render_shell(
             state.tab_scroll,
             state.reveal_focused_tab,
             state.tab_drag_insert_index,
+            state.selected_tab_id,
             &mut hits,
         );
     }
